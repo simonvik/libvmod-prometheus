@@ -47,7 +47,7 @@ struct prometheus_value
 	char *type;
 };
 
-void loop_print(struct prometheus_priv *p)
+void synth_response(struct prometheus_priv *p)
 {
 	struct prometheus_group *k_item;
 	struct prometheus_value *v_item;
@@ -245,7 +245,6 @@ vmod_render(VRT_CTX)
 	p.ws = ctx->ws;
 
 	CHECK_OBJ_NOTNULL(p.ws, WS_MAGIC);
-	//(void) WS_ReserveAll(p.ws );
 
 	vsc = VSC_New();
 	AN(vsc);
@@ -267,5 +266,5 @@ vmod_render(VRT_CTX)
 
 	(void)VSC_Iter(vsc, vd, do_once_cb, &p);
 
-	loop_print(&p);
+	synth_response(&p);
 }
