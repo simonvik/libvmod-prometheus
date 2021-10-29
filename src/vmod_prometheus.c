@@ -96,7 +96,6 @@ void group_insert(struct prometheus_priv *p, char *group_name, const char *descr
 
 	if (group == NULL)
 	{
-		//ALLOC_OBJ(group, PROMETHEUS_GROUP_OBJECT_MAGIC);
 		group = WS_Alloc(p->ws, sizeof(struct prometheus_group));
 		group->description = WS_Copy(p->ws, description, strlen(description) + 1);
 		group->group_name = WS_Copy(p->ws, group_name, strlen(group_name) + 1);
@@ -205,31 +204,6 @@ static int v_matchproto_(VSC_iter_f)
 	}
 
 	return 0;
-
-#if 0
-	struct once_priv *op;
-	uint64_t val;
-	int i;
-
-	if (pt == NULL)
-		return (0);
-	op = priv;
-	AZ(strcmp(pt->ctype, "uint64_t"));
-	val = VSC_Value(pt);
-	i = 0;
-	i += printf("NAME : %s\n", pt->name);
-	if (i >= op->pad)
-		op->pad = i + 1;
-	printf("%*.*s", op->pad - i, op->pad - i, "");
-	if (pt->semantics == 'c')
-		printf("%12ju %12.2f %s\n",
-		    (uintmax_t)val, op->up ? val / op->up : 0,
-		    pt->sdesc);
-	else
-		printf("%12ju %12s %s\n",
-		    (uintmax_t)val, ".  ", pt->sdesc);
-	return (0);
-#endif
 }
 
 VCL_VOID
