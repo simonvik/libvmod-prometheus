@@ -64,7 +64,7 @@ void synth_response(struct prometheus_priv *p)
 	{
 
 		VSB_printf(p->vsb, "# HELP %s %s\n", k_item->group_name, k_item->description);
-		VSB_printf(p->vsb, "# TYPE %s %s gauge\n", k_item->group_name, k_item->description);
+		VSB_printf(p->vsb, "# TYPE %s gauge\n", k_item->group_name);
 		VTAILQ_FOREACH(v_item, &k_item->v, list)
 		{
 			VSB_printf(p->vsb, "%s", k_item->group_name);
