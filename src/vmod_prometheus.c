@@ -47,6 +47,14 @@ struct prometheus_value
 	char *type;
 };
 
+char *cleaup_backend_name(char *backend)
+{
+	if (strncmp(backend, "boot.", 5) == 0 || strncmp(backend, "root:", 5) == 0)
+		return backend + 5;
+
+	return backend;
+}
+
 void synth_response(struct prometheus_priv *p)
 {
 	struct prometheus_group *k_item;
@@ -61,7 +69,14 @@ void synth_response(struct prometheus_priv *p)
 		{
 			VSB_printf(p->vsb, "%s", k_item->group_name);
 
-			if (v_item->id != NULL || v_item->target != NULL || v_item->type != NULL)
+			if (v_item->server != NULL && v_item->server != NULL)
+			{
+				VSB_printf(p->vsb, "{");
+				VSB_printf(p->vsb, "server=%s", v_item->server);
+				VSB_printf(p->vsb, ", backend=%s", cleaup_backend_name(v_item->backend));
+				VSB_printf(p->vsb, "}");
+			}
+			else if (v_item->id != NULL || v_item->target != NULL || v_item->type != NULL)
 			{
 				VSB_printf(p->vsb, "{");
 				if (v_item->id != NULL)
@@ -122,9 +137,20 @@ char *strncat_lower(char *dest, const char *src, size_t n)
 static int v_matchproto_(VSC_iter_f)
 	do_once_cb(void *priv, const struct VSC_point *const pt)
 {
+	// This function is nasty, please fix
+	// It tries to copy prometheus.go in some way.
+
 	const char *p;
 	const char *firstdot = NULL;
 	const char *lastdot = NULL;
+	struct prometheus_value *v;
+
+	// Hack hack, used for VBE
+	const char *seconddot = NULL;
+
+	const char *startparentheses = NULL;
+	const char *closeparentheses = NULL;
+
 	struct prometheus_priv *pp = priv;
 
 	//Hold temporary name, this might be superunsafe
@@ -136,17 +162,61 @@ static int v_matchproto_(VSC_iter_f)
 	{
 		if (*p == '.')
 		{
+			if (firstdot != NULL && seconddot == NULL)
+				seconddot = p;
+
 			if (firstdot == NULL)
 				firstdot = p;
 
 			lastdot = p;
 		}
+
+		if (*p == '(' && startparentheses == NULL)
+			startparentheses = p;
+
+		if (*p == ')')
+			closeparentheses = p;
 	}
+
+	v = WS_Alloc(pp->ws, sizeof(struct prometheus_value));
 
 	if (pt->name[0] == 'V' && pt->name[1] == 'B' && pt->name[2] == 'E')
 	{
-		// Handle this in special way
-		return 0;
+		v->server = "UNKNOWN";
+		v->backend = "UNKNOWN";
+
+		strcat(tmp, "varnish_backend_");
+		strcat(tmp, lastdot + 1);
+
+		if (startparentheses == NULL && seconddot > firstdot)
+		{
+			if (seconddot != NULL)
+			{
+				v->server = WS_Alloc(pp->ws, seconddot - firstdot);
+				strncpy(v->server, firstdot + 1, seconddot - firstdot - 1);
+			}
+
+			if (lastdot > seconddot)
+			{
+				v->backend = WS_Alloc(pp->ws, lastdot - seconddot);
+				strncpy(v->backend, seconddot + 1, lastdot - seconddot - 1);
+			}
+		}
+		else if (startparentheses != NULL && startparentheses < closeparentheses)
+		{
+			v->server = WS_Alloc(pp->ws, startparentheses - firstdot);
+			strncpy(v->server, firstdot + 1, startparentheses - firstdot - 1);
+
+			v->backend = WS_Alloc(pp->ws, closeparentheses - startparentheses);
+			strncpy(v->backend, startparentheses + 1, closeparentheses - startparentheses - 1);
+		}
+		else if (firstdot < lastdot)
+		{
+			v->backend = WS_Alloc(pp->ws, lastdot - firstdot);
+			strncpy(v->backend, firstdot + 1, lastdot - firstdot - 1);
+		}
+
+		group_insert(pp, tmp, pt->sdesc, v);
 	}
 	else
 	{
@@ -156,10 +226,6 @@ static int v_matchproto_(VSC_iter_f)
 		strncat_lower(tmp, pt->name, firstdot - pt->name);
 		strcat(tmp, "_");
 		strcat(tmp, lastdot + 1);
-
-		struct prometheus_value *v;
-
-		v = WS_Alloc(pp->ws, sizeof(struct prometheus_value));
 
 		target = &v->id;
 
@@ -192,10 +258,12 @@ static int v_matchproto_(VSC_iter_f)
 			target = &v->type;
 		}
 
-		if (firstdot != lastdot){
+		if (firstdot != lastdot)
+		{
 			*target = WS_Alloc(pp->ws, lastdot - firstdot);
 			strncpy(*target, firstdot + 1, lastdot - firstdot - 1);
-		}else
+		}
+		else
 			*target = NULL;
 
 		v->val = (double)VSC_Value(pt);
