@@ -47,7 +47,7 @@ struct prometheus_value
 	char *type;
 };
 
-char *cleaup_backend_name(char *backend)
+static char *cleaup_backend_name(char *backend)
 {
 	if (strncmp(backend, "boot.", 5) == 0 || strncmp(backend, "root:", 5) == 0)
 		return backend + 5;
@@ -55,7 +55,7 @@ char *cleaup_backend_name(char *backend)
 	return backend;
 }
 
-void synth_response(struct prometheus_priv *p)
+static void synth_response(struct prometheus_priv *p)
 {
 	struct prometheus_group *k_item;
 	struct prometheus_value *v_item;
@@ -95,7 +95,7 @@ void synth_response(struct prometheus_priv *p)
 	}
 }
 
-void group_insert(struct prometheus_priv *p, char *group_name, const char *description, struct prometheus_value *v)
+static void group_insert(struct prometheus_priv *p, char *group_name, const char *description, struct prometheus_value *v)
 {
 	struct prometheus_group *iter_group = NULL;
 	struct prometheus_group *group = NULL;
@@ -122,7 +122,7 @@ void group_insert(struct prometheus_priv *p, char *group_name, const char *descr
 	VTAILQ_INSERT_TAIL(&group->v, v, list);
 }
 
-char *strncat_lower(char *dest, const char *src, size_t n)
+static char *strncat_lower(char *dest, const char *src, size_t n)
 {
 	size_t dest_len = strlen(dest);
 	size_t i;
