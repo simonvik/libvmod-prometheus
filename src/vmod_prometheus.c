@@ -140,6 +140,7 @@ static int v_matchproto_(VSC_iter_f)
 	// This function is nasty, please fix
 	// It tries to copy prometheus.go in some way.
 
+
 	const char *p;
 	const char *firstdot = NULL;
 	const char *lastdot = NULL;
@@ -155,6 +156,9 @@ static int v_matchproto_(VSC_iter_f)
 
 	//Hold temporary name, this might be superunsafe
 	char tmp[300] = {0};
+
+	if(pt == NULL)
+		return 0;
 
 	AZ(strcmp(pt->ctype, "uint64_t"));
 
