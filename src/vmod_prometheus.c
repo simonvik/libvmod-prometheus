@@ -90,7 +90,7 @@ void synth_response(struct prometheus_priv *p)
 
 				VSB_printf(p->vsb, "}");
 			}
-			VSB_printf(p->vsb, " %f\n", v_item->val);
+			VSB_printf(p->vsb, " %g\n", v_item->val);
 		}
 	}
 }
