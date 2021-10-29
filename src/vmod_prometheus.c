@@ -278,16 +278,19 @@ static int v_matchproto_(VSC_iter_f)
 }
 
 VCL_VOID
-vmod_render(VRT_CTX)
+vmod_render(VRT_CTX, struct vmod_priv *priv)
 {
 	struct vsc *vsc;
 	struct vsm *vd;
-	struct prometheus_priv p = {};
 
-	VTAILQ_INIT(&p.groups);
-	p.ws = ctx->ws;
+	priv->priv =  WS_Alloc(ctx->ws, sizeof(struct prometheus_priv));
 
-	CHECK_OBJ_NOTNULL(p.ws, WS_MAGIC);
+	struct prometheus_priv *p = priv->priv;
+
+	VTAILQ_INIT(&p->groups);
+	p->ws = ctx->ws;
+
+	CHECK_OBJ_NOTNULL(p->ws, WS_MAGIC);
 
 	vsc = VSC_New();
 	AN(vsc);
@@ -297,7 +300,7 @@ vmod_render(VRT_CTX)
 
 	struct vsc *vsconce = VSC_New();
 
-	CAST_OBJ_NOTNULL(p.vsb, ctx->specific, VSB_MAGIC);
+	CAST_OBJ_NOTNULL(p->vsb, ctx->specific, VSB_MAGIC);
 
 	if (VSM_Attach(vd, STDERR_FILENO))
 	{
@@ -307,7 +310,6 @@ vmod_render(VRT_CTX)
 	AN(vsconce);
 	AN(VSC_Arg(vsconce, 'f', "MAIN.uptime"));
 
-	(void)VSC_Iter(vsc, vd, do_once_cb, &p);
-
-	synth_response(&p);
+	(void)VSC_Iter(vsc, vd, do_once_cb, p);
+	synth_response(p);
 }

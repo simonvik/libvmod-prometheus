@@ -1,2 +1,2 @@
 $Module prometheus 3 Prometheus VMOD
-$Function VOID render()
+$Function VOID render(PRIV_TASK)
