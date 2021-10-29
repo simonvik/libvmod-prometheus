@@ -55,7 +55,8 @@ void synth_response(struct prometheus_priv *p)
 	VTAILQ_FOREACH(k_item, &p->groups, list)
 	{
 
-		VSB_printf(p->vsb, "HELP %s %s\n", k_item->group_name, k_item->description);
+		VSB_printf(p->vsb, "# HELP %s %s\n", k_item->group_name, k_item->description);
+		VSB_printf(p->vsb, "# TYPE %s %s gauge\n", k_item->group_name, k_item->description);
 		VTAILQ_FOREACH(v_item, &k_item->v, list)
 		{
 			VSB_printf(p->vsb, "%s", k_item->group_name);
@@ -81,9 +82,6 @@ void synth_response(struct prometheus_priv *p)
 
 void group_insert(struct prometheus_priv *p, char *group_name, const char *description, struct prometheus_value *v)
 {
-	// This code can probably be more optimized...
-	// And possible allocated on stack, it could be a fair bit of data?
-
 	struct prometheus_group *iter_group = NULL;
 	struct prometheus_group *group = NULL;
 
@@ -161,7 +159,6 @@ static int v_matchproto_(VSC_iter_f)
 		strcat(tmp, lastdot + 1);
 
 		struct prometheus_value *v;
-		//ALLOC_OBJ(v, PROMETHEUS_VALUE_OBJECT_MAGIC);
 
 		v = WS_Alloc(pp->ws, sizeof(struct prometheus_value));
 
@@ -196,9 +193,10 @@ static int v_matchproto_(VSC_iter_f)
 			target = &v->type;
 		}
 
-		if (firstdot != lastdot)
-			*target = WS_Copy(pp->ws, firstdot + 1, lastdot - firstdot - 1);
-		else
+		if (firstdot != lastdot){
+			*target = WS_Alloc(pp->ws, lastdot - firstdot);
+			strncpy(*target, firstdot + 1, lastdot - firstdot - 1);
+		}else
 			*target = NULL;
 
 		v->val = (double)VSC_Value(pt);
