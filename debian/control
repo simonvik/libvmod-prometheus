@@ -1,0 +1,25 @@
+Source: libvmod-prometheus
+Section: net
+Priority: optional
+Homepage: http://devsn.se
+Maintainer: Simon Stridsberg <simon@devsn.se>
+Build-Depends: debhelper (>= 9),
+ autotools-dev,
+ dh-autoreconf,
+ libtool,
+ varnish-dev (>=5),
+ automake,
+ python3-sphinx,
+ python3-docutils,
+Standards-Version: 3.9.4
+
+Package: libvmod-prometheus
+Architecture: any
+Pre-Depends: ${misc:Pre-Depends},
+ dpkg (>= 1.15.6~)
+Depends: ${misc:Depends},
+ ${shlibs:Depends}
+Multi-Arch: same
+Description: libvmod-prometheus
+
+

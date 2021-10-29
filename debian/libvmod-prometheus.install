@@ -1,0 +1,2 @@
+debian/tmp/usr/lib/x86_64-linux-gnu/varnish/vmods/*.so	/usr/lib/varnish/vmods/
+debian/tmp/usr/lib/x86_64-linux-gnu/varnish/vmods/*.la	/usr/lib/varnish/vmods/

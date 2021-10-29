@@ -32,8 +32,6 @@ m4_ifndef([VARNISH_PREREQ], AC_MSG_ERROR([Need varnish.m4 -- see README.rst]))
 VARNISH_PREREQ([6.2])
 VARNISH_VMODS([prometheus])
 
-VMOD_TESTS="$(cd $srcdir/src && echo tests/*.vtc)"
-AC_SUBST(VMOD_TESTS)
 
 PKG_CHECK_VAR([LIBVARNISHAPI_LIBDIR], [varnishapi], [libdir])
 AC_SUBST([VARNISH_LIBRARY_PATH],

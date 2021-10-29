@@ -14,15 +14,5 @@ dist_man_MANS = vmod_prometheus.3
 
 @BUILD_VMOD_PROMETHEUS@
 
-AM_TESTS_ENVIRONMENT = \
-	PATH="$(VMOD_TEST_PATH)" \
-	LD_LIBRARY_PATH="$(VARNISH_LIBRARY_PATH)"
-TEST_EXTENSIONS = .vtc
-VTC_LOG_COMPILER = varnishtest -v
-AM_VTC_LOG_FLAGS = -Dvmod_prometheus="$(VMOD_PROMETHEUS)"
-
-TESTS = @VMOD_TESTS@
-
 EXTRA_DIST = \
-	vmod_prometheus.vcc \
-	$(VMOD_TESTS)
+	vmod_prometheus.vcc 
