@@ -72,21 +72,21 @@ void synth_response(struct prometheus_priv *p)
 			if (v_item->server != NULL && v_item->server != NULL)
 			{
 				VSB_printf(p->vsb, "{");
-				VSB_printf(p->vsb, "server=%s", v_item->server);
-				VSB_printf(p->vsb, ", backend=%s", cleaup_backend_name(v_item->backend));
+				VSB_printf(p->vsb, "server=\"%s\"", v_item->server);
+				VSB_printf(p->vsb, ", backend=\"%s\"", cleaup_backend_name(v_item->backend));
 				VSB_printf(p->vsb, "}");
 			}
 			else if (v_item->id != NULL || v_item->target != NULL || v_item->type != NULL)
 			{
 				VSB_printf(p->vsb, "{");
 				if (v_item->id != NULL)
-					VSB_printf(p->vsb, "id=%s", v_item->id);
+					VSB_printf(p->vsb, "id=\"%s\"", v_item->id);
 
 				if (v_item->target != NULL)
-					VSB_printf(p->vsb, "target=%s", v_item->target);
+					VSB_printf(p->vsb, "target=\"%s\"", v_item->target);
 
 				if (v_item->type != NULL)
-					VSB_printf(p->vsb, "type=%s", v_item->type);
+					VSB_printf(p->vsb, "type=\"%s\"", v_item->type);
 
 				VSB_printf(p->vsb, "}");
 			}
