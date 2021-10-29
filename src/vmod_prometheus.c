@@ -137,7 +137,6 @@ static char *strncat_lower(char *dest, const char *src, size_t n)
 static int v_matchproto_(VSC_iter_f)
 	do_once_cb(void *priv, const struct VSC_point *const pt)
 {
-	// This function is nasty, please fix
 	// It tries to copy prometheus.go in some way.
 
 
