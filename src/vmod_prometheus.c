@@ -73,6 +73,7 @@ static char *cleaup_backend_name(char *backend)
 
 static void synth_response(struct prometheus_priv *p)
 {
+	// This function will empty the queues and render it
 	struct prometheus_group *k_item;
 	struct prometheus_value *v_item;
 
@@ -109,6 +110,7 @@ static void synth_response(struct prometheus_priv *p)
 				VSB_printf(p->vsb, "}");
 			}
 			VSB_printf(p->vsb, " %g\n", v_item->val);
+
 			VTAILQ_REMOVE(&k_item->v, v_item, list);
 			free(v_item->server);
 			free(v_item->backend);
@@ -214,9 +216,6 @@ static int v_matchproto_(VSC_iter_f)
 
 	if (pt->name[0] == 'V' && pt->name[1] == 'B' && pt->name[2] == 'E')
 	{
-		v->server = "UNKNOWN";
-		v->backend = "UNKNOWN";
-
 		strcat(tmp, "varnish_backend_");
 		strcat(tmp, lastdot + 1);
 
@@ -241,6 +240,12 @@ static int v_matchproto_(VSC_iter_f)
 		{
 			v->backend = strndup(firstdot + 1, lastdot - firstdot - 1);
 		}
+
+		if (v->backend == NULL)
+			v->backend = strdup("UNKNOWN");
+
+		if (v->server == NULL)
+			v->server = strdup("UNKNOWN");
 
 		group_insert(pp, tmp, pt->sdesc, v);
 	}
