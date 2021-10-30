@@ -19,14 +19,18 @@
 
 struct prometheus_priv
 {
+	unsigned magic;
+#define PROMETHEUS_PRIV_OBJECT_MAGIC 0x13391339
 	VTAILQ_HEAD(, prometheus_group)
 	groups;
 	struct vsb *vsb;
-	struct ws *ws;
+	
 };
 
 struct prometheus_group
 {
+	unsigned magic;
+#define PROMETHEUS_GROUP_OBJECT_MAGIC 0x13391339
 	VTAILQ_ENTRY(prometheus_group)
 	list;
 	VTAILQ_HEAD(, prometheus_value)
@@ -37,6 +41,8 @@ struct prometheus_group
 
 struct prometheus_value
 {
+	unsigned magic;
+#define PROMETHEUS_VALUE_OBJECT_MAGIC 0x13391339
 	VTAILQ_ENTRY(prometheus_value)
 	list;
 	double val;
@@ -46,6 +52,20 @@ struct prometheus_value
 	char *target;
 	char *type;
 };
+
+static void
+myfree(VRT_CTX, void *p)
+{
+        CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+		free(p);
+}
+
+static const struct vmod_priv_methods priv_vcl_method[1] = {{
+        .magic = VMOD_PRIV_METHODS_MAGIC,
+        .type = "vmod_prometheus_priv_vcl",
+        .fini = myfree
+}};
+
 
 static char *cleaup_backend_name(char *backend)
 {
@@ -60,13 +80,14 @@ static void synth_response(struct prometheus_priv *p)
 	struct prometheus_group *k_item;
 	struct prometheus_value *v_item;
 
-	VTAILQ_FOREACH(k_item, &p->groups, list)
-	{
+	while (!VTAILQ_EMPTY(&p->groups)){
+		k_item = VTAILQ_FIRST(&p->groups);
 
 		VSB_printf(p->vsb, "# HELP %s %s\n", k_item->group_name, k_item->description);
 		VSB_printf(p->vsb, "# TYPE %s gauge\n", k_item->group_name);
-		VTAILQ_FOREACH(v_item, &k_item->v, list)
-		{
+		while (!VTAILQ_EMPTY(&k_item->v)){
+
+			v_item = VTAILQ_FIRST(&k_item->v);
 			VSB_printf(p->vsb, "%s", k_item->group_name);
 
 			if (v_item->server != NULL && v_item->server != NULL)
@@ -91,7 +112,19 @@ static void synth_response(struct prometheus_priv *p)
 				VSB_printf(p->vsb, "}");
 			}
 			VSB_printf(p->vsb, " %g\n", v_item->val);
+			VTAILQ_REMOVE(&k_item->v, v_item, list);
+			free(v_item->server);
+			free(v_item->backend);
+			free(v_item->id);
+			free(v_item->target);
+			free(v_item->type);
+			FREE_OBJ(v_item);
 		}
+
+		VTAILQ_REMOVE(&p->groups, k_item, list);
+		free(k_item->group_name);
+		free(k_item->description);
+		FREE_OBJ(k_item);
 	}
 }
 
@@ -111,9 +144,9 @@ static void group_insert(struct prometheus_priv *p, char *group_name, const char
 
 	if (group == NULL)
 	{
-		group = WS_Alloc(p->ws, sizeof(struct prometheus_group));
-		group->description = WS_Copy(p->ws, description, strlen(description) + 1);
-		group->group_name = WS_Copy(p->ws, group_name, strlen(group_name) + 1);
+		ALLOC_OBJ(group, PROMETHEUS_GROUP_OBJECT_MAGIC);
+		group->description = strdup(description);
+		group->group_name = strdup(group_name);
 
 		VTAILQ_INIT(&group->v);
 		VTAILQ_INSERT_TAIL(&p->groups, group, list);
@@ -181,7 +214,8 @@ static int v_matchproto_(VSC_iter_f)
 			closeparentheses = p;
 	}
 
-	v = WS_Alloc(pp->ws, sizeof(struct prometheus_value));
+	
+	ALLOC_OBJ(v, PROMETHEUS_VALUE_OBJECT_MAGIC);
 
 	if (pt->name[0] == 'V' && pt->name[1] == 'B' && pt->name[2] == 'E')
 	{
@@ -195,28 +229,22 @@ static int v_matchproto_(VSC_iter_f)
 		{
 			if (seconddot != NULL)
 			{
-				v->server = WS_Alloc(pp->ws, seconddot - firstdot);
-				strncpy(v->server, firstdot + 1, seconddot - firstdot - 1);
+				v->server = strndup(firstdot + 1, seconddot - firstdot - 1);
 			}
 
 			if (lastdot > seconddot)
 			{
-				v->backend = WS_Alloc(pp->ws, lastdot - seconddot);
-				strncpy(v->backend, seconddot + 1, lastdot - seconddot - 1);
+				v->backend = strndup(seconddot + 1, lastdot - seconddot - 1);
 			}
 		}
 		else if (startparentheses != NULL && startparentheses < closeparentheses)
 		{
-			v->server = WS_Alloc(pp->ws, startparentheses - firstdot);
-			strncpy(v->server, firstdot + 1, startparentheses - firstdot - 1);
-
-			v->backend = WS_Alloc(pp->ws, closeparentheses - startparentheses);
-			strncpy(v->backend, startparentheses + 1, closeparentheses - startparentheses - 1);
+			v->server = strndup(firstdot + 1, startparentheses - firstdot - 1);
+			v->backend = strndup(startparentheses + 1, closeparentheses - startparentheses - 1);
 		}
 		else if (firstdot < lastdot)
 		{
-			v->backend = WS_Alloc(pp->ws, lastdot - firstdot);
-			strncpy(v->backend, firstdot + 1, lastdot - firstdot - 1);
+			v->backend = strndup(firstdot + 1, lastdot - firstdot - 1);
 		}
 
 		group_insert(pp, tmp, pt->sdesc, v);
@@ -263,8 +291,7 @@ static int v_matchproto_(VSC_iter_f)
 
 		if (firstdot != lastdot)
 		{
-			*target = WS_Alloc(pp->ws, lastdot - firstdot);
-			strncpy(*target, firstdot + 1, lastdot - firstdot - 1);
+			*target = strndup(firstdot + 1, lastdot - firstdot - 1);
 		}
 		else
 			*target = NULL;
@@ -283,14 +310,12 @@ vmod_render(VRT_CTX, struct vmod_priv *priv)
 	struct vsc *vsc;
 	struct vsm *vd;
 
-	priv->priv =  WS_Alloc(ctx->ws, sizeof(struct prometheus_priv));
-
 	struct prometheus_priv *p = priv->priv;
-
+	ALLOC_OBJ(p, PROMETHEUS_PRIV_OBJECT_MAGIC);
+	priv->methods = priv_vcl_method;
+	
 	VTAILQ_INIT(&p->groups);
-	p->ws = ctx->ws;
-
-	CHECK_OBJ_NOTNULL(p->ws, WS_MAGIC);
+	
 
 	vsc = VSC_New();
 	AN(vsc);
@@ -311,5 +336,8 @@ vmod_render(VRT_CTX, struct vmod_priv *priv)
 	AN(VSC_Arg(vsconce, 'f', "MAIN.uptime"));
 
 	(void)VSC_Iter(vsc, vd, do_once_cb, p);
+	VSC_Destroy(&vsconce, vd);
+
 	synth_response(p);
+
 }
