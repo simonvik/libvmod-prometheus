@@ -24,7 +24,6 @@ struct prometheus_priv
 	VTAILQ_HEAD(, prometheus_group)
 	groups;
 	struct vsb *vsb;
-	
 };
 
 struct prometheus_group
@@ -56,16 +55,13 @@ struct prometheus_value
 static void
 myfree(VRT_CTX, void *p)
 {
-        CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-		free(p);
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	free(p);
 }
 
-static const struct vmod_priv_methods priv_vcl_method[1] = {{
-        .magic = VMOD_PRIV_METHODS_MAGIC,
-        .type = "vmod_prometheus_priv_vcl",
-        .fini = myfree
-}};
-
+static const struct vmod_priv_methods priv_vcl_method[1] = {{.magic = VMOD_PRIV_METHODS_MAGIC,
+															 .type = "vmod_prometheus_priv_vcl",
+															 .fini = myfree}};
 
 static char *cleaup_backend_name(char *backend)
 {
@@ -80,13 +76,14 @@ static void synth_response(struct prometheus_priv *p)
 	struct prometheus_group *k_item;
 	struct prometheus_value *v_item;
 
-	while (!VTAILQ_EMPTY(&p->groups)){
+	while (!VTAILQ_EMPTY(&p->groups))
+	{
 		k_item = VTAILQ_FIRST(&p->groups);
 
 		VSB_printf(p->vsb, "# HELP %s %s\n", k_item->group_name, k_item->description);
 		VSB_printf(p->vsb, "# TYPE %s gauge\n", k_item->group_name);
-		while (!VTAILQ_EMPTY(&k_item->v)){
-
+		while (!VTAILQ_EMPTY(&k_item->v))
+		{
 			v_item = VTAILQ_FIRST(&k_item->v);
 			VSB_printf(p->vsb, "%s", k_item->group_name);
 
@@ -172,7 +169,6 @@ static int v_matchproto_(VSC_iter_f)
 {
 	// It tries to copy prometheus.go in some way.
 
-
 	const char *p;
 	const char *firstdot = NULL;
 	const char *lastdot = NULL;
@@ -189,7 +185,7 @@ static int v_matchproto_(VSC_iter_f)
 	//Hold temporary name, this might be superunsafe
 	char tmp[300] = {0};
 
-	if(pt == NULL)
+	if (pt == NULL)
 		return 0;
 
 	AZ(strcmp(pt->ctype, "uint64_t"));
@@ -214,7 +210,6 @@ static int v_matchproto_(VSC_iter_f)
 			closeparentheses = p;
 	}
 
-	
 	ALLOC_OBJ(v, PROMETHEUS_VALUE_OBJECT_MAGIC);
 
 	if (pt->name[0] == 'V' && pt->name[1] == 'B' && pt->name[2] == 'E')
@@ -313,9 +308,8 @@ vmod_render(VRT_CTX, struct vmod_priv *priv)
 	struct prometheus_priv *p = priv->priv;
 	ALLOC_OBJ(p, PROMETHEUS_PRIV_OBJECT_MAGIC);
 	priv->methods = priv_vcl_method;
-	
+
 	VTAILQ_INIT(&p->groups);
-	
 
 	vsc = VSC_New();
 	AN(vsc);
@@ -339,5 +333,4 @@ vmod_render(VRT_CTX, struct vmod_priv *priv)
 	VSC_Destroy(&vsconce, vd);
 
 	synth_response(p);
-
 }
