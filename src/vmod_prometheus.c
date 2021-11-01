@@ -166,6 +166,23 @@ static char *strncat_lower(char *dest, const char *src, size_t n)
 	return dest;
 }
 
+static int v_matchproto_(VSC_Iter_f) do_once_cb_first(void *priv, const struct VSC_point *const pt)
+{
+	//Do something about this probably
+
+	uint64_t val;
+
+	if (pt == NULL)
+		return (0);
+
+	AZ(strcmp(pt->ctype, "uint64_t"));
+	if (strcmp(pt->name, "MAIN.uptime"))
+		return (0);
+	val = VSC_Value(pt);
+	(void)val;
+	return (1);
+}
+
 static int v_matchproto_(VSC_iter_f)
 	do_once_cb(void *priv, const struct VSC_point *const pt)
 {
@@ -334,8 +351,11 @@ vmod_render(VRT_CTX, struct vmod_priv *priv)
 	AN(vsconce);
 	AN(VSC_Arg(vsconce, 'f', "MAIN.uptime"));
 
-	(void)VSC_Iter(vsc, vd, do_once_cb, p);
+	(void)VSC_Iter(vsconce, vd, do_once_cb_first, p);
 	VSC_Destroy(&vsconce, vd);
+	(void)VSC_Iter(vsc, vd, do_once_cb, p);
+	VSC_Destroy(&vsc, vd);
+	VSM_Destroy(&vd);
 
 	synth_response(p);
 }
