@@ -79,7 +79,6 @@ static void synth_response(struct prometheus_priv *p)
 
 	CHECK_OBJ_NOTNULL(p, PROMETHEUS_PRIV_OBJECT_MAGIC);
 
-
 	while (!VTAILQ_EMPTY(&p->groups))
 	{
 		k_item = VTAILQ_FIRST(&p->groups);
