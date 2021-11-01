@@ -77,15 +77,21 @@ static void synth_response(struct prometheus_priv *p)
 	struct prometheus_group *k_item;
 	struct prometheus_value *v_item;
 
+	CHECK_OBJ_NOTNULL(p, PROMETHEUS_PRIV_OBJECT_MAGIC);
+
+
 	while (!VTAILQ_EMPTY(&p->groups))
 	{
 		k_item = VTAILQ_FIRST(&p->groups);
+		CHECK_OBJ_NOTNULL(k_item, PROMETHEUS_GROUP_OBJECT_MAGIC);
 
 		VSB_printf(p->vsb, "# HELP %s %s\n", k_item->group_name, k_item->description);
 		VSB_printf(p->vsb, "# TYPE %s gauge\n", k_item->group_name);
 		while (!VTAILQ_EMPTY(&k_item->v))
 		{
 			v_item = VTAILQ_FIRST(&k_item->v);
+			CHECK_OBJ_NOTNULL(v_item, PROMETHEUS_VALUE_OBJECT_MAGIC);
+
 			VSB_printf(p->vsb, "%s", k_item->group_name);
 
 			if (v_item->server != NULL && v_item->server != NULL)
@@ -131,6 +137,8 @@ static void group_insert(struct prometheus_priv *p, char *group_name, const char
 {
 	struct prometheus_group *iter_group = NULL;
 	struct prometheus_group *group = NULL;
+
+	CHECK_OBJ_NOTNULL(v, PROMETHEUS_VALUE_OBJECT_MAGIC);
 
 	VTAILQ_FOREACH(iter_group, &p->groups, list)
 	{
@@ -340,7 +348,6 @@ vmod_render(VRT_CTX, struct vmod_priv *priv)
 	AN(vd);
 
 	struct vsc *vsconce = VSC_New();
-
 	CAST_OBJ_NOTNULL(p->vsb, ctx->specific, VSB_MAGIC);
 
 	if (VSM_Attach(vd, STDERR_FILENO))
