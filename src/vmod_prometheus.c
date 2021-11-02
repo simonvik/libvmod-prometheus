@@ -287,6 +287,9 @@ static int v_matchproto_(VSC_iter_f)
 	ALLOC_OBJ(v, PROMETHEUS_VALUE_OBJECT_MAGIC);
 	v->val = (double)VSC_Value(pt);
 
+	if(lastdot == NULL || firstdot == NULL)
+		return 0;
+
 	// Parse VBE, try to figure out whats backend and server
 	if (pt->name[0] == 'V' && pt->name[1] == 'B' && pt->name[2] == 'E')
 	{
@@ -333,6 +336,7 @@ static int v_matchproto_(VSC_iter_f)
 
 	if (lastunderscore != NULL && lastunderscore > lastdot)
 	{
+		// If we have a underscore then concat until the underscore
 		strcat(tmp, "_");
 		strncat(tmp, lastdot + 1, lastunderscore - lastdot - 1);
 
@@ -340,9 +344,7 @@ static int v_matchproto_(VSC_iter_f)
 		{
 			if (strncmp(tmp, g->prefix, strlen(g->prefix)) == 0 && lastunderscore != NULL)
 			{
-
 				target = &v->type;
-
 				*target = strdup(lastunderscore + 1);
 
 				group_insert(pp, tmp, g->desc, v);
@@ -354,6 +356,7 @@ static int v_matchproto_(VSC_iter_f)
 	}
 	else
 	{
+		// Just add everything from the last dot
 		strcat(tmp, "_");
 		strcat(tmp, lastdot + 1);
 	}
@@ -378,7 +381,7 @@ static int v_matchproto_(VSC_iter_f)
 		}
 	}
 
-	if (firstdot != lastdot)
+	if (firstdot < lastdot)
 	{
 		*target = strndup(firstdot + 1, lastdot - firstdot - 1);
 	}
