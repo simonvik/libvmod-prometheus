@@ -53,15 +53,55 @@ struct prometheus_value
 };
 
 static void
-myfree(VRT_CTX, void *p)
+vmod_priv_free(VRT_CTX, void *p)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	free(p);
 }
 
+const struct Groupings
+{
+	const char *prefix;
+	const char *desc;
+} groupings[] = {
+	{"varnish_main_fetch", "Number of fetches"},
+	{"varnish_main_sessions", "Number of sessions"},
+	{"varnish_main_worker_threads", "Number of worker threads"},
+	{NULL, NULL},
+};
+
+const char *target_indentifers[] = {
+	"varnish_lck_collisions",
+	"varnish_lck_created",
+	"varnish_lck_destroyed",
+	"varnish_lck_operations",
+	NULL,
+};
+
+const char *type_indentifers[] = {
+	"varnish_sma_c_bytes",
+	"varnish_sma_c_fail",
+	"varnish_sma_c_freed",
+	"varnish_sma_c_req",
+	"varnish_sma_g_alloc",
+	"varnish_sma_g_bytes",
+	"varnish_sma_g_space",
+	"varnish_smf_c_bytes",
+	"varnish_smf_c_fail",
+	"varnish_smf_c_freed",
+	"varnish_smf_c_req",
+	"varnish_smf_g_alloc",
+	"varnish_smf_g_bytes",
+	"varnish_smf_g_smf_frag",
+	"varnish_smf_g_smf_large",
+	"varnish_smf_g_smf",
+	"varnish_smf_g_space",
+	NULL,
+};
+
 static const struct vmod_priv_methods priv_vcl_method[1] = {{.magic = VMOD_PRIV_METHODS_MAGIC,
 															 .type = "vmod_prometheus_priv_vcl",
-															 .fini = myfree}};
+															 .fini = vmod_priv_free}};
 
 static char *cleaup_backend_name(char *backend)
 {
@@ -196,20 +236,25 @@ static int v_matchproto_(VSC_iter_f)
 	// It tries to copy prometheus.go in some way.
 
 	const char *p;
-	const char *firstdot = NULL;
-	const char *lastdot = NULL;
+
+	const char **identifier = NULL;
 	struct prometheus_value *v;
 
-	// Hack hack, used for VBE
+	const char *firstdot = NULL;
+	const char *lastdot = NULL;
 	const char *seconddot = NULL;
 
 	const char *startparentheses = NULL;
 	const char *closeparentheses = NULL;
 
+	const char *lastunderscore = NULL;
+
 	struct prometheus_priv *pp = priv;
 
+	const struct Groupings *g;
+
 	//Hold temporary name, this might be superunsafe
-	char tmp[300] = {0};
+	char tmp[200] = {0};
 
 	if (pt == NULL)
 		return 0;
@@ -234,10 +279,15 @@ static int v_matchproto_(VSC_iter_f)
 
 		if (*p == ')')
 			closeparentheses = p;
+
+		if (*p == '_' && lastunderscore == NULL)
+			lastunderscore = p;
 	}
 
 	ALLOC_OBJ(v, PROMETHEUS_VALUE_OBJECT_MAGIC);
+	v->val = (double)VSC_Value(pt);
 
+	// Parse VBE, try to figure out whats backend and server
 	if (pt->name[0] == 'V' && pt->name[1] == 'B' && pt->name[2] == 'E')
 	{
 		strcat(tmp, "varnish_backend_");
@@ -272,58 +322,68 @@ static int v_matchproto_(VSC_iter_f)
 			v->server = strdup("UNKNOWN");
 
 		group_insert(pp, tmp, pt->sdesc, v);
+		return 0;
+	}
+
+	char **target;
+
+	// Create prefix
+	strcat(tmp, "varnish_");
+	strncat_lower(tmp, pt->name, firstdot - pt->name);
+
+	if (lastunderscore != NULL && lastunderscore > lastdot)
+	{
+		strcat(tmp, "_");
+		strncat(tmp, lastdot + 1, lastunderscore - lastdot - 1);
+
+		for (g = groupings; g->prefix != NULL; g++)
+		{
+			if (strncmp(tmp, g->prefix, strlen(g->prefix)) == 0 && lastunderscore != NULL)
+			{
+
+				target = &v->type;
+
+				*target = strdup(lastunderscore + 1);
+
+				group_insert(pp, tmp, g->desc, v);
+				return 0;
+			}
+		}
+
+		strcat(tmp, lastunderscore);
 	}
 	else
 	{
-		char **target;
-
-		strcat(tmp, "varnish_");
-		strncat_lower(tmp, pt->name, firstdot - pt->name);
 		strcat(tmp, "_");
 		strcat(tmp, lastdot + 1);
+	}
 
-		target = &v->id;
+	target = &v->id;
 
-		if (strcmp(tmp, "varnish_lock_collisions") == 0 ||
-			strcmp(tmp, "varnish_lock_created") == 0 ||
-			strcmp(tmp, "varnish_lock_destroyed") == 0 ||
-			strcmp(tmp, "varnish_lock_operations") == 0)
+	for (identifier = target_indentifers; *identifier != NULL; identifier++)
+	{
+		if (strcmp(tmp, *identifier) == 0)
 		{
 			target = &v->target;
+			break;
 		}
+	}
 
-		if (strcmp(tmp, "varnish_sma_c_bytes") == 0 ||
-			strcmp(tmp, "varnish_sma_c_fail") == 0 ||
-			strcmp(tmp, "varnish_sma_c_freed") == 0 ||
-			strcmp(tmp, "varnish_sma_c_req") == 0 ||
-			strcmp(tmp, "varnish_sma_g_alloc") == 0 ||
-			strcmp(tmp, "varnish_sma_g_bytes") == 0 ||
-			strcmp(tmp, "varnish_sma_g_space") == 0 ||
-			strcmp(tmp, "varnish_smf_c_bytes") == 0 ||
-			strcmp(tmp, "varnish_smf_c_fail") == 0 ||
-			strcmp(tmp, "varnish_smf_c_freed") == 0 ||
-			strcmp(tmp, "varnish_smf_c_req") == 0 ||
-			strcmp(tmp, "varnish_smf_g_alloc") == 0 ||
-			strcmp(tmp, "varnish_smf_g_bytes") == 0 ||
-			strcmp(tmp, "varnish_smf_g_smf_frag") == 0 ||
-			strcmp(tmp, "varnish_smf_g_smf_large") == 0 ||
-			strcmp(tmp, "varnish_smf_g_smf") == 0 ||
-			strcmp(tmp, "varnish_smf_g_space") == 0)
+	for (identifier = type_indentifers; *identifier != NULL; identifier++)
+	{
+		if (strcmp(tmp, *identifier) == 0)
 		{
 			target = &v->type;
+			break;
 		}
-
-		if (firstdot != lastdot)
-		{
-			*target = strndup(firstdot + 1, lastdot - firstdot - 1);
-		}
-		else
-			*target = NULL;
-
-		v->val = (double)VSC_Value(pt);
-
-		group_insert(pp, tmp, pt->sdesc, v);
 	}
+
+	if (firstdot != lastdot)
+	{
+		*target = strndup(firstdot + 1, lastdot - firstdot - 1);
+	}
+
+	group_insert(pp, tmp, pt->sdesc, v);
 
 	return 0;
 }
