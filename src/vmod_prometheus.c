@@ -70,11 +70,24 @@ const struct Groupings
 	{NULL, NULL},
 };
 
+const struct Fqnames
+{
+	const char *from;
+	const char *to;
+} fqnames[] = {
+	{"varnish_lck_colls", "varnish_lock_collisions"},
+	{"varnish_lck_creat", "varnish_lock_created"},
+	{"varnish_lck_destroy", "varnish_lock_destroyed"},
+	{"varnish_lck_locks", "varnish_lock_operations"},
+	{"varnish_lck_dbg", "varnish_lock_debug"},
+	{NULL, NULL},
+};
+
 const char *target_indentifers[] = {
-	"varnish_lck_collisions",
-	"varnish_lck_created",
-	"varnish_lck_destroyed",
-	"varnish_lck_operations",
+	"varnish_lock_collisions",
+	"varnish_lock_created",
+	"varnish_lock_destroyed",
+	"varnish_lock_operations",
 	NULL,
 };
 
@@ -230,28 +243,47 @@ static int v_matchproto_(VSC_Iter_f) do_once_cb_first(void *priv, const struct V
 	return (1);
 }
 
+static void fixup_name(char *name)
+{
+
+	// Possible slightly unsafe, fix me?
+	char tmp[200] = {0};
+	size_t l = 0;
+
+	const struct Fqnames *f;
+
+	// Rewrite some wierd names
+	for (f = fqnames; f->from != NULL; f++)
+	{
+		if (strncmp(name, f->from, strlen(f->from)) == 0)
+		{
+			l = strlen(f->to);
+			strcpy(tmp, f->to);
+			strcpy(tmp + l, name + l);
+			strcpy(name, tmp);
+			return;
+		}
+	}
+}
+
 static int v_matchproto_(VSC_iter_f)
 	do_once_cb(void *priv, const struct VSC_point *const pt)
 {
 	// It tries to copy prometheus.go in some way.
-
 	const char *p;
-
 	const char **identifier = NULL;
 	struct prometheus_value *v;
 
 	const char *firstdot = NULL;
 	const char *lastdot = NULL;
 	const char *seconddot = NULL;
-
 	const char *startparentheses = NULL;
 	const char *closeparentheses = NULL;
-
 	const char *lastunderscore = NULL;
 
 	struct prometheus_priv *pp = priv;
-
 	const struct Groupings *g;
+	char **target;
 
 	//Hold temporary name, this might be superunsafe
 	char tmp[200] = {0};
@@ -287,7 +319,7 @@ static int v_matchproto_(VSC_iter_f)
 	ALLOC_OBJ(v, PROMETHEUS_VALUE_OBJECT_MAGIC);
 	v->val = (double)VSC_Value(pt);
 
-	if(lastdot == NULL || firstdot == NULL)
+	if (lastdot == NULL || firstdot == NULL)
 		return 0;
 
 	// Parse VBE, try to figure out whats backend and server
@@ -328,8 +360,6 @@ static int v_matchproto_(VSC_iter_f)
 		return 0;
 	}
 
-	char **target;
-
 	// Create prefix
 	strcat(tmp, "varnish_");
 	strncat_lower(tmp, pt->name, firstdot - pt->name);
@@ -339,6 +369,7 @@ static int v_matchproto_(VSC_iter_f)
 		// If we have a underscore then concat until the underscore
 		strcat(tmp, "_");
 		strncat(tmp, lastdot + 1, lastunderscore - lastdot - 1);
+		fixup_name(tmp);
 
 		for (g = groupings; g->prefix != NULL; g++)
 		{
@@ -360,6 +391,8 @@ static int v_matchproto_(VSC_iter_f)
 		strcat(tmp, "_");
 		strcat(tmp, lastdot + 1);
 	}
+
+	fixup_name(tmp);
 
 	target = &v->id;
 
